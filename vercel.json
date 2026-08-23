@@ -2,5 +2,10 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
   "buildCommand": "vite build",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/github/:path*", "destination": "/api/github?upstreamPath=:path*" },
+    { "source": "/api/greptile/:path*", "destination": "/api/greptile?upstreamPath=:path*" },
+    { "source": "/api/skybox/:path*", "destination": "/api/skybox?upstreamPath=:path*" }
+  ]
 }

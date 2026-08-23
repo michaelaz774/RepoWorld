@@ -1,4 +1,4 @@
-import { proxyRequest } from '../_proxy.js';
+import { proxyRequest } from './_proxy.js';
 
 /** /api/github/* -> https://api.github.com/* with the PAT attached server-side. */
 export default async function handler(req, res) {

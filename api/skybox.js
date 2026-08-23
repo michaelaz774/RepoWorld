@@ -1,4 +1,4 @@
-import { proxyRequest } from '../_proxy.js';
+import { proxyRequest } from './_proxy.js';
 
 /** /api/skybox/* -> https://backend.blockadelabs.com/* with the Blockade key attached.
  *  Optional: with no key set the app falls back to the procedural voxel sky. */

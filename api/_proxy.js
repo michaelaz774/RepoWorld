@@ -1,47 +1,49 @@
 /**
- * Shared upstream proxy for Vercel serverless functions.
+ * Shared upstream proxy for the Vercel serverless functions.
  *
- * In local dev, `vite.config.js`'s `server.proxy` handles /api/* and injects the auth
- * headers. That proxy does NOT exist in a Vercel deployment (the build is static files on
- * a CDN), so these functions reproduce it. Keep the two in sync: same paths, same injected
- * headers, same upstreams.
+ * In local dev, `vite.config.js`'s `server.proxy` handles /api/* and injects auth headers.
+ * That proxy does NOT exist in a Vercel deployment (the build is static files on a CDN),
+ * so these functions reproduce it. Keep the two in sync: same paths, same headers, same
+ * upstreams.
+ *
+ * ROUTING NOTE — do not "simplify" this back to a catch-all file.
+ * `api/github/[...path].js` looked correct but Vercel matched it as a SINGLE dynamic
+ * segment literally named `...path`: `/api/github/rate_limit` worked while
+ * `/api/github/repos/facebook/react` returned Vercel's own NOT_FOUND before ever reaching
+ * the function. Instead `vercel.json` rewrites `/api/<name>/:path*` to a plain
+ * `/api/<name>` function with the full remainder handed over as `?upstreamPath=...`,
+ * which is unambiguous and doesn't depend on catch-all filename semantics.
  *
  * Secrets are read from process.env at request time and never reach the browser.
  */
 
-/**
- * Rebuild the upstream path + query from the incoming request.
- *
- * Vercel is not consistent about what `req.url` contains for a catch-all route (it may or
- * may not still carry the /api/<name> prefix depending on rewrites), and getting this wrong
- * silently produces URLs like https://api.github.com/api/github/repos/... which 404 — the
- * exact failure this function exists to avoid. So prefer the parsed catch-all segments
- * (`req.query.path`), which are unambiguous, and only fall back to string-slicing req.url.
- */
+const UPSTREAM_PARAM = 'upstreamPath';
+
+/** Rebuild the upstream path + query from the rewritten request. */
 function buildUpstreamPath(req, prefix) {
   const query = req.query || {};
-  const segments = query.path;
 
-  // Preserve every query param except the catch-all itself.
+  let rest = query[UPSTREAM_PARAM];
+  if (Array.isArray(rest)) rest = rest.join('/');
+
+  // Preserve the caller's own query params (e.g. ?recursive=1), minus our routing param.
   const params = new URLSearchParams();
   for (const [k, v] of Object.entries(query)) {
-    if (k === 'path') continue;
+    if (k === UPSTREAM_PARAM) continue;
     if (Array.isArray(v)) v.forEach((item) => params.append(k, item));
     else if (v != null) params.append(k, String(v));
   }
   const search = params.toString();
 
-  if (Array.isArray(segments) && segments.length) {
-    return '/' + segments.map(encodeURIComponent).join('/') + (search ? `?${search}` : '');
-  }
-  if (typeof segments === 'string' && segments) {
-    return '/' + encodeURIComponent(segments) + (search ? `?${search}` : '');
+  if (typeof rest === 'string' && rest.length) {
+    const path = rest.startsWith('/') ? rest : '/' + rest;
+    return path + (search ? `?${search}` : '');
   }
 
-  // Fallback: slice the prefix off req.url if it's still present.
+  // Fallback for a direct hit that skipped the rewrite: slice the prefix off req.url.
   const rawUrl = req.url || '/';
-  const path = rawUrl.startsWith(prefix) ? rawUrl.slice(prefix.length) : rawUrl;
-  return path.startsWith('/') ? path : '/' + path;
+  const sliced = rawUrl.startsWith(prefix) ? rawUrl.slice(prefix.length) : rawUrl;
+  return sliced.startsWith('/') ? sliced : '/' + sliced;
 }
 
 /**
@@ -75,8 +77,8 @@ export async function proxyRequest(req, res, opts) {
     const contentType = upstream.headers.get('content-type');
     if (contentType) res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'no-store');
-    // Surfaced so a misrouted proxy is debuggable from the browser's network tab without
-    // guessing. Contains no secrets — only the public upstream path being requested.
+    // Public upstream path only — no secrets. Makes a misrouted proxy debuggable straight
+    // from the browser's network tab instead of by guesswork.
     res.setHeader('X-Proxy-Upstream', upstreamUrl.slice(0, 200));
     res.send(text);
   } catch (err) {

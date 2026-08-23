@@ -1,4 +1,4 @@
-import { proxyRequest } from '../_proxy.js';
+import { proxyRequest } from './_proxy.js';
 
 /** /api/greptile/* -> https://api.greptile.com/* with both auth headers attached. */
 export default async function handler(req, res) {
