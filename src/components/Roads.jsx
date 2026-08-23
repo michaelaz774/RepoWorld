@@ -29,7 +29,15 @@
  */
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import { getVoxelGeometry, computeRoadCells, cellKey, makePixelTexture, hashStr, mulberry32 } from './Ground.jsx';
+import {
+  getVoxelGeometry,
+  getFlatQuadGeometry,
+  computeRoadCells,
+  cellKey,
+  makePixelTexture,
+  hashStr,
+  mulberry32,
+} from './Ground.jsx';
 
 /* ------------------------------------------------------------------ */
 /* Materials (built once, shared by every instance in a bucket).       */
@@ -140,17 +148,22 @@ function normalizeSegment(r) {
   };
 }
 
-/** Build one InstancedMesh from {ix,iz[,tint]} cells + a Y placement. Null if empty. */
-function buildBlocks(cells, material, topY, height, withTint) {
+/** Build one InstancedMesh from {ix,iz[,tint]} cells + a Y placement. Null if empty.
+ *  Pass `flat: true` for a cell layer that's flush and contiguous with itself (the road
+ *  surface — never shows a side face, same reasoning as Ground.jsx's ground field) to use a
+ *  2-triangle top tile instead of a 12-triangle cube. Don't pass it for the sidewalk: its
+ *  raised curb riser is a real, visible side face. */
+function buildBlocks(cells, material, topY, height, withTint, flat = false) {
   if (!cells.length) return null;
-  const mesh = new THREE.InstancedMesh(getVoxelGeometry(), material, cells.length);
+  const geometry = flat ? getFlatQuadGeometry() : getVoxelGeometry();
+  const mesh = new THREE.InstancedMesh(geometry, material, cells.length);
   const m = new THREE.Matrix4();
   const pos = new THREE.Vector3();
   const quat = new THREE.Quaternion();
-  const scale = new THREE.Vector3(1, height, 1);
+  const scale = new THREE.Vector3(1, flat ? 1 : height, 1);
   for (let i = 0; i < cells.length; i++) {
     const c = cells[i];
-    pos.set(c.ix + 0.5, topY - height, c.iz + 0.5);
+    pos.set(c.ix + 0.5, flat ? topY : topY - height, c.iz + 0.5);
     m.compose(pos, quat, scale);
     mesh.setMatrixAt(i, m);
     if (withTint) mesh.setColorAt(i, c.tint || WHITE);
@@ -264,7 +277,7 @@ export default function Roads({ layout }) {
   }, [roads]);
 
   const roadMesh = useMemo(
-    () => (built ? buildBlocks(built.roadCells, getRoadMat(), 0, 1, true) : null),
+    () => (built ? buildBlocks(built.roadCells, getRoadMat(), 0, 1, true, true) : null),
     [built]
   );
   const sidewalkMesh = useMemo(
