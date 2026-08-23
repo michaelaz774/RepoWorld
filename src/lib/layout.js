@@ -676,25 +676,54 @@ export function findSpawn(layout) {
   if (!layout || !Array.isArray(layout.buildings) || layout.buildings.length === 0) {
     return { x: 0, y: EYE_HEIGHT, z: 8 };
   }
-  // Spawn relative to where the BUILDINGS actually are, not `bounds` — bounds also covers
-  // roads, plots and margins, which can sit far outside the built-up area and would strand
-  // the player dozens of units away staring at a distant strip of city.
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let maxZ = -Infinity;
-  for (const bd of layout.buildings) {
-    if (bd.x - bd.w / 2 < minX) minX = bd.x - bd.w / 2;
-    if (bd.x + bd.w / 2 > maxX) maxX = bd.x + bd.w / 2;
-    if (bd.z + bd.d / 2 > maxZ) maxZ = bd.z + bd.d / 2;
-  }
-  const x = (minX + maxX) / 2;
-  // Just outside the nearest buildings: close enough that the city fills the view on spawn.
-  let z = maxZ + 10;
-  // Paranoia: step outward until clear of every footprint (+1 unit of personal space).
+
   const blocked = (px, pz) =>
     layout.buildings.some(
       (bd) => Math.abs(px - bd.x) < bd.w / 2 + 1 && Math.abs(pz - bd.z) < bd.d / 2 + 1
     );
+
+  /** Spiral outward from a target point until we find ground clear of every footprint. */
+  const clearNear = (tx, tz) => {
+    if (!blocked(tx, tz)) return { x: tx, y: EYE_HEIGHT, z: tz };
+    for (let r = 2; r <= 64; r += 2) {
+      for (let a = 0; a < 12; a++) {
+        const th = (a / 12) * Math.PI * 2;
+        const px = tx + Math.cos(th) * r;
+        const pz = tz + Math.sin(th) * r;
+        if (!blocked(px, pz)) return { x: px, y: EYE_HEIGHT, z: pz };
+      }
+    }
+    return null;
+  };
+
+  // Spawn in the ROOT district — where README/package.json/entry-point files live. It's the
+  // natural place to start reading a repo, and it drops the player inside the city rather
+  // than outside looking in.
+  const districts = Array.isArray(layout.districts) ? layout.districts : [];
+  const root = districts.find((d) => d && d.name === '/');
+  if (root && Number.isFinite(root.x) && Number.isFinite(root.z)) {
+    const spot = clearNear(root.x, root.z);
+    if (spot) return spot;
+  }
+
+  // No root-level files in this repo: fall back to the centre of the built-up area, still
+  // inside the city.
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const bd of layout.buildings) {
+    if (bd.x - bd.w / 2 < minX) minX = bd.x - bd.w / 2;
+    if (bd.x + bd.w / 2 > maxX) maxX = bd.x + bd.w / 2;
+    if (bd.z - bd.d / 2 < minZ) minZ = bd.z - bd.d / 2;
+    if (bd.z + bd.d / 2 > maxZ) maxZ = bd.z + bd.d / 2;
+  }
+  const centre = clearNear((minX + maxX) / 2, (minZ + maxZ) / 2);
+  if (centre) return centre;
+
+  // Last resort: just outside the near edge of the city.
+  const x = (minX + maxX) / 2;
+  let z = maxZ + 10;
   for (let tries = 0; tries < 64 && blocked(x, z); tries++) z += 2;
   return { x, y: EYE_HEIGHT, z };
 }

@@ -587,11 +587,43 @@ describe('findSpawn', () => {
         Math.abs(s.x - b.x) < b.w / 2 && Math.abs(s.z - b.z) < b.d / 2;
       expect(inside).toBe(false);
     }
-    // On the +Z side of the built-up area, so facing -Z looks at the skyline...
-    const buildingMaxZ = Math.max(...layout.buildings.map((b) => b.z + b.d / 2));
-    expect(s.z).toBeGreaterThan(buildingMaxZ);
-    // ...but close to it. Spawning past `bounds` (which covers roads/plots/margins well
-    // outside the buildings) strands the player staring at a distant strip of city.
-    expect(s.z - buildingMaxZ).toBeLessThan(25);
+    // Spawn is now INSIDE the city — in the root district where README/entry-point files
+    // live — rather than outside the edge looking in.
+    const b = layout.bounds;
+    expect(s.x).toBeGreaterThanOrEqual(b.minX);
+    expect(s.x).toBeLessThanOrEqual(b.maxX);
+    expect(s.z).toBeGreaterThanOrEqual(b.minZ);
+    expect(s.z).toBeLessThanOrEqual(b.maxZ);
+  });
+
+  it('spawns in the root district when the repo has root-level files', () => {
+    const layout = buildCity(syntheticFiles(350));
+    const root = layout.districts.find((d) => d.name === '/');
+    if (!root) return; // nothing to assert for a repo with no root-level files
+    const s = findSpawn(layout);
+    // Within the root district's block (plus the clearance spiral's reach).
+    expect(Math.abs(s.x - root.x)).toBeLessThan(root.w / 2 + 64);
+    expect(Math.abs(s.z - root.z)).toBeLessThan(root.d / 2 + 64);
+  });
+
+  it('falls back to the city centre when there is no root district', () => {
+    // Every file nested under a directory -> no '/' district exists.
+    const nested = Array.from({ length: 40 }, (_, i) => ({
+      path: `src/mod${i}/file${i}.js`,
+      name: `file${i}.js`,
+      dir: `src/mod${i}`,
+      size: 2000 + i * 100,
+      ext: 'js',
+      lang: 'JavaScript',
+    }));
+    const layout = buildCity(nested);
+    const s = findSpawn(layout);
+    expect(Number.isFinite(s.x)).toBe(true);
+    expect(Number.isFinite(s.z)).toBe(true);
+    expect(s.y).toBe(EYE_HEIGHT);
+    for (const b of layout.buildings) {
+      const inside = Math.abs(s.x - b.x) < b.w / 2 && Math.abs(s.z - b.z) < b.d / 2;
+      expect(inside).toBe(false);
+    }
   });
 });
