@@ -644,8 +644,13 @@ export default function Buildings({ buildings = [], fetchCode = null }) {
       setNearLabels(chosen);
     }
 
-    const wantPanel =
-      fid != null && playerState.focusedDistance <= PANEL_RADIUS && idToBuilding.has(fid)
+    // While the cursor is free (Esc pressed), the player is reading/scrolling the panel —
+    // hold whatever is open rather than letting focus drift yank it away mid-scroll. Normal
+    // focus tracking resumes as soon as they re-lock and start moving again.
+    const readingPanel = !playerState.locked && panelIdRef.current != null;
+    const wantPanel = readingPanel
+      ? panelIdRef.current
+      : fid != null && playerState.focusedDistance <= PANEL_RADIUS && idToBuilding.has(fid)
         ? fid
         : null;
     if (wantPanel !== panelIdRef.current) {
