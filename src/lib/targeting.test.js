@@ -169,3 +169,45 @@ describe('isInFront', () => {
     expect(isInFront(CAM, { x: NaN, y: 0, z: 0 })).toBe(false);
   });
 });
+
+describe('beam-column targeting (aim at the beacon, not just the bug)', () => {
+  // Camera at eye height, looking straight down -Z at a bug 40 units away.
+  const camAt = (pitchY) => ({ x: 0, y: 2, z: 0, dirX: 0, dirY: pitchY, dirZ: -1 });
+  const bug = { id: 'bug-1', x: 0, y: 0, z: -40, beamHeight: 46 };
+  const opts = { maxDistance: 140, coneDegrees: 5 };
+
+  it('hits the bug when aiming level at it', () => {
+    expect(pickTarget(camAt(0), [bug], opts)).toBe('bug-1');
+  });
+
+  it('hits when the crosshair is up on the beam, far above the bug itself', () => {
+    // Looking up ~28 degrees: nowhere near the bug on the ground, but squarely on the
+    // beacon column rising above it.
+    const cam = { x: 0, y: 2, z: 0, dirX: 0, dirY: 0.53, dirZ: -1 };
+    expect(pickTarget(cam, [bug], opts)).toBe('bug-1');
+  });
+
+  it('misses when aiming well off to the side of both bug and beam', () => {
+    const cam = { x: 0, y: 2, z: 0, dirX: 0.6, dirY: 0, dirZ: -1 };
+    expect(pickTarget(cam, [bug], opts)).toBeNull();
+  });
+
+  it('misses when aiming above the top of the beam', () => {
+    // Straight up — past the beam's 46-unit ceiling.
+    const cam = { x: 0, y: 2, z: 0, dirX: 0, dirY: 6, dirZ: -1 };
+    expect(pickTarget(cam, [bug], opts)).toBeNull();
+  });
+
+  it('a bug with no beamHeight still behaves as a plain point target', () => {
+    const flat = { id: 'flat', x: 0, y: 0, z: -40 };
+    expect(pickTarget(camAt(0), [flat], opts)).toBe('flat');
+    const cam = { x: 0, y: 2, z: 0, dirX: 0, dirY: 0.53, dirZ: -1 };
+    expect(pickTarget(cam, [flat], opts)).toBeNull();
+  });
+
+  it('prefers the candidate the crosshair is actually closest to', () => {
+    const near = { id: 'near', x: 0, y: 0, z: -30, beamHeight: 46 };
+    const offAxis = { id: 'off', x: 2, y: 0, z: -20, beamHeight: 46 };
+    expect(pickTarget(camAt(0), [offAxis, near], opts)).toBe('near');
+  });
+});

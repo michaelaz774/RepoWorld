@@ -34,6 +34,10 @@
 
 const DEFAULT_MAX_DISTANCE = 60;
 const DEFAULT_CONE_DEGREES = 12;
+/** How many points to test along a candidate's beacon column. 9 is dense enough that a
+ *  tall beam has no gaps the crosshair can slip through, and cheap enough to run over
+ *  every bug on a throttled frame. */
+const BEAM_SAMPLES = 9;
 const DEG_TO_RAD = Math.PI / 180;
 const EPS = 1e-9;
 
@@ -131,19 +135,42 @@ export function pickTarget(camera, candidates, opts = {}) {
     const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
     if (dist > maxDistance) continue;
 
-    let angle;
-    if (!(dist > EPS)) {
-      // Candidate sits exactly at the camera position — undefined direction,
-      // treat as dead-on rather than throwing it out or dividing by zero.
-      angle = 0;
-    } else {
-      const nx = dx / dist, ny = dy / dist, nz = dz / dist;
-      let dot = v.x * nx + v.y * ny + v.z * nz;
-      if (dot > 1) dot = 1; else if (dot < -1) dot = -1;
-      if (dot <= 0) continue; // behind (or exactly perpendicular to) the camera
-      angle = Math.acos(dot);
+    // A bug is a small object on the ground, but it carries a tall beacon column. Aiming
+    // is measured against the whole vertical segment (bug -> top of its beam), so putting
+    // the crosshair anywhere on the beam counts as aiming at the bug. That lets the cone
+    // stay tight — you must actually point at the thing — while still being practical at
+    // range, where the bug itself is only a few pixels tall.
+    const beam = isFiniteNum(c.beamHeight) && c.beamHeight > 0 ? c.beamHeight : 0;
+    const samples = beam > 0 ? BEAM_SAMPLES : 1;
+
+    let angle = Infinity;
+    let sampleDist = dist;
+    for (let s = 0; s < samples; s++) {
+      const t = samples === 1 ? 0 : s / (samples - 1);
+      const sy = py + beam * t;
+      const ddy = sy - cy;
+      const d2 = Math.sqrt(dx * dx + ddy * ddy + dz * dz);
+
+      let a;
+      if (!(d2 > EPS)) {
+        // Sample sits exactly at the camera position — undefined direction; treat as
+        // dead-on rather than dividing by zero.
+        a = 0;
+      } else {
+        const nx = dx / d2, ny = ddy / d2, nz = dz / d2;
+        let dot = v.x * nx + v.y * ny + v.z * nz;
+        if (dot > 1) dot = 1; else if (dot < -1) dot = -1;
+        if (dot <= 0) continue; // this sample is behind the camera
+        a = Math.acos(dot);
+      }
+      if (a < angle) {
+        angle = a;
+        sampleDist = d2;
+      }
     }
+    if (!isFiniteNum(angle)) continue; // every sample was behind the camera
     if (angle > coneRad) continue;
+    void sampleDist;
 
     const id = c.id;
     let takeIt = false;

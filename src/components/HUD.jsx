@@ -79,12 +79,15 @@ function LandingScreen({ onSubmit }) {
       </div>
       <div className="rw-bg-ground" aria-hidden="true" />
       <div className="rw-landing-inner">
-        <div className="rw-kicker">a blocky adventure through your codebase</div>
+        <div className="rw-kicker">a visual ide for your codebase</div>
         <h1 className="rw-title">
           REPO<span className="rw-title-accent">WORLD</span>
         </h1>
         <p className="rw-tagline">
           Explore your code like a world. Hunt the bugs. Watch Greptile fix them.
+        </p>
+        <p className="rw-subtagline">
+          A visual IDE you can walk through — every file a building, every issue a monster.
         </p>
 
         <form

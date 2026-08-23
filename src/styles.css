@@ -231,10 +231,17 @@ body {
 }
 
 .rw-tagline {
-  margin: 14px 0 34px;
+  margin: 14px 0 6px;
   font-size: 18px;
   font-weight: 700;
   color: var(--rw-text-strong);
+}
+
+.rw-subtagline {
+  margin: 0 0 32px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--rw-dirt-dark);
 }
 
 .rw-input-row {

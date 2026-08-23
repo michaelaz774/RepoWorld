@@ -28,11 +28,15 @@ import { Billboard, Text } from '@react-three/drei';
 import { playerState } from '../lib/playerState.js';
 import { pickTarget } from '../lib/targeting.js';
 
-// Tuned up after playtesting: the city got substantially larger (8-unit streets) and the
-// creatures got smaller, so the original 60u/12deg was too tight to reliably land a target
-// and the game read as unresponsive. Generous aim assist matters far more than precision here.
+// Aiming is deliberately precise now: you must actually put the crosshair on a bug or on
+// its red beacon column, rather than vaguely facing its direction. That's possible with a
+// tight cone only because pickTarget measures against the whole beam segment (see
+// BEAM_HEIGHT below) — the beam is a tall, easy-to-hit target even from across the city,
+// while the narrow cone stops it from grabbing bugs you aren't looking at.
 const MAX_DISTANCE = 140;      // world units — reach most of a district from where you stand
-const CONE_DEGREES = 22;       // half-angle — very forgiving on a small blocky bug
+const CONE_DEGREES = 5;        // half-angle — must genuinely be on the bug or its beam
+// Must match the beacon column height in Bugs.jsx (beams rise to y=46).
+const BEAM_HEIGHT = 46;
 const THROTTLE_FRAMES = 3;     // re-pick the target every 3rd frame; doesn't need 60Hz
 const DEFAULT_RADIUS = 0.5;    // fallback bug radius if the chase sim omits it
 const HOVER_GAP = 0.9;         // marker floats this far above the bug's radius
@@ -52,7 +56,10 @@ const _candidates = [];
 const _pool = [];
 function poolSlot(i) {
   let s = _pool[i];
-  if (!s) { s = { id: null, x: 0, y: 0, z: 0, radius: DEFAULT_RADIUS, ref: null }; _pool[i] = s; }
+  if (!s) {
+    s = { id: null, x: 0, y: 0, z: 0, radius: DEFAULT_RADIUS, beamHeight: 0, ref: null };
+    _pool[i] = s;
+  }
   return s;
 }
 
@@ -191,6 +198,9 @@ export default function Targeting({ chase = null, onDeploy = null }) {
           slot.id = b.id != null ? b.id : i;
           slot.x = b.x; slot.y = by; slot.z = b.z;
           slot.radius = Number.isFinite(b.radius) ? b.radius : DEFAULT_RADIUS;
+          // The bug's beacon column is part of its hit target, so aiming at the beam
+          // counts as aiming at the bug.
+          slot.beamHeight = BEAM_HEIGHT;
           slot.ref = b;
           n++;
         }
