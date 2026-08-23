@@ -39,7 +39,11 @@ import { activeQuests } from '../lib/quests.js';
 import { getVoxelGeometry, hashStr, mulberry32 } from './Ground.jsx';
 import './npc.css';
 
-const TALK_RADIUS = 4;
+// Widened after playtesting: at 4 units you had to walk almost exactly onto an NPC, and
+// since NPCs are spread across a ~240-unit city (nearest one ~57 units from spawn) the talk
+// key just looked broken. Being generous here costs nothing — the prompt only shows for the
+// single nearest NPC anyway.
+const TALK_RADIUS = 12;
 const TALK_RADIUS_SQ = TALK_RADIUS * TALK_RADIUS;
 const PROXIMITY_INTERVAL = 0.2; // seconds
 const BOB_SPEED = 1.6;
