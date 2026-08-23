@@ -26,8 +26,10 @@ import { playerState } from '../lib/playerState.js';
 import { EYE_HEIGHT } from '../lib/types.js';
 
 const WALK_SPEED = 6;
-const SPRINT_SPEED = 12;
-const FLY_MULT = 1.4;          // fly moves a bit faster for the city-overview beat
+// Sprint is the "cross the city" gear. The city grew a lot (8-unit streets, districts
+// spread over ~240 units), so the old 2x walk speed made getting anywhere a slog.
+const SPRINT_SPEED = 26;
+const FLY_MULT = 1.8;          // fly moves faster still, for the city-overview beat
 const ACCEL = 11;              // velocity lerp rate (per second) — snappy, not floaty
 const GRAVITY = 30;
 const JUMP_SPEED = 9;
