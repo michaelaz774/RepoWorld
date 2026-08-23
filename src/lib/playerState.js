@@ -39,6 +39,11 @@ export const playerState = {
   /** True while a full-screen panel (review or dialogue) has focus. Player controls
    *  and pointer lock should stand down while this is true. */
   uiFocused: false,
+
+  /** Set by Targeting each time the player successfully deploys Greptile:
+   *  `{ bugId, at }` where `at` is a monotonic timestamp. The deploy toast watches
+   *  this so it can confirm the action fired without extra prop plumbing. */
+  lastDeploy: null,
 };
 
 // Exposed for debugging/inspection from the console (read-only in practice).

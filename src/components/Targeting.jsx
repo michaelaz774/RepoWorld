@@ -147,6 +147,9 @@ export default function Targeting({ chase = null, onDeploy = null }) {
       const bugId = playerState.targetedBug;
       if (bugId == null) return;
       playerState.deployRequested = true;
+      // Stamped so the deploy toast can confirm the press landed. Uses performance.now()
+      // rather than Date.now() so it's monotonic and unaffected by clock changes.
+      playerState.lastDeploy = { bugId, at: performance.now() };
       const fn = onDeployRef.current;
       if (typeof fn === 'function') fn(bugId);
     };

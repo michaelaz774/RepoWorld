@@ -121,7 +121,7 @@ export default function Scene({
 
   return (
     <Canvas
-      shadows={false}
+      shadows="soft"
       dpr={[1, 1.75]}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       camera={{ fov: 72, near: 0.1, far: 2000, position: [spawn.x, spawn.y, spawn.z] }}

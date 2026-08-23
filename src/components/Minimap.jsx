@@ -7,10 +7,14 @@
  */
 import { useEffect, useRef } from 'react';
 import { playerState } from '../lib/playerState.js';
+import { activeQuests } from '../lib/quests.js';
 
 const HAZARD_COLORS = { issue: '#d43b2e', pr: '#9b5fc0', risk: '#e0a52a' };
 const BUG_COLOR = '#d43b2e';       // red — same red as HAZARD_COLORS.issue / --rw-red
 const GREPTILE_COLOR = '#3ec95a';  // green — matches the in-world Greptile beacon color
+const NPC_NEW_COLOR = '#ffd23f';   // gold — matches NPCs.jsx's "!" marker/beacon
+const NPC_OTHER_COLOR = '#8fd3ff'; // blue — matches NPCs.jsx's "?" marker/beacon (and the
+                                    // dim "nothing new" beacon closely enough at this scale)
 
 /**
  * Pull a live bug array out of `chase`. Shape/liveness is owned by another
@@ -34,15 +38,19 @@ function extractGreptiles(chase) {
   return null;
 }
 
-export default function Minimap({ layout, hazards = [], chase = null, size = 190 }) {
+export default function Minimap({ layout, hazards = [], chase = null, npcs = [], questState = null, size = 190 }) {
   const canvasRef = useRef(null);
   const layoutRef = useRef(layout);
   const hazardsRef = useRef(hazards);
   const chaseRef = useRef(chase);
+  const npcsRef = useRef(npcs);
+  const questStateRef = useRef(questState);
   const byIdCache = useRef({ layout: null, map: new Map() });
   layoutRef.current = layout;
   hazardsRef.current = hazards;
   chaseRef.current = chase;
+  npcsRef.current = npcs;
+  questStateRef.current = questState;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -180,6 +188,28 @@ export default function Minimap({ layout, hazards = [], chase = null, size = 190
           const pz = Math.round(wz(g.z));
           const r = 3;
           ctx.fillStyle = GREPTILE_COLOR;
+          ctx.fillRect(px - r, pz - r, r * 2, r * 2);
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(px - r + 0.5, pz - r + 0.5, r * 2, r * 2);
+        }
+      }
+
+      // NPCs (gold = fresh quest, blue = in-progress/nothing new) — a third,
+      // distinct color family from bugs (red) and Greptiles (green), matching
+      // NPCs.jsx's beacon/marker colors so the map and the world agree.
+      const npcList = Array.isArray(npcsRef.current) ? npcsRef.current : [];
+      if (npcList.length) {
+        const progressById = new Map();
+        for (const q of activeQuests(questStateRef.current)) progressById.set(q.id, q.progress);
+        for (const npc of npcList) {
+          if (!npc || !Number.isFinite(npc.x) || !Number.isFinite(npc.z)) continue;
+          const p = npc.questId ? progressById.get(npc.questId) : null;
+          const isNew = !!(p && !(p.current > 0));
+          const px = Math.round(wx(npc.x));
+          const pz = Math.round(wz(npc.z));
+          const r = 3;
+          ctx.fillStyle = isNew ? NPC_NEW_COLOR : NPC_OTHER_COLOR;
           ctx.fillRect(px - r, pz - r, r * 2, r * 2);
           ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
           ctx.lineWidth = 1;

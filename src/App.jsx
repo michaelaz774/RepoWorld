@@ -2,6 +2,7 @@ import { Component, useCallback, useEffect, useMemo, useRef, useState } from 're
 import Scene from './Scene.jsx';
 import HUD from './components/HUD.jsx';
 import ReviewPanel from './components/ReviewPanel.jsx';
+import DeployToast from './components/DeployToast.jsx';
 import { loadWorld } from './lib/pipeline.js';
 import { makeCodeFetcher } from './lib/github.js';
 import { isMockRepo } from './lib/mockData.js';
@@ -193,9 +194,12 @@ export default function App() {
         world={worldForHud}
         error={error}
         chase={chase}
+        npcs={npcs}
+        questState={questRef.current}
         onSubmit={handleSubmit}
         onReset={handleReset}
       />
+      {phase === 'ready' ? <DeployToast chase={chase} /> : null}
       {phase === 'ready' && reviewHazard ? (
         <ReviewPanel
           repo={world?.repo || null}

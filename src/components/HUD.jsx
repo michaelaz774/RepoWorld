@@ -42,9 +42,21 @@ function formatBytes(n) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function HUD({ phase, progress, world, error, chase = null, onSubmit, onReset }) {
+export default function HUD({
+  phase,
+  progress,
+  world,
+  error,
+  chase = null,
+  npcs = [],
+  questState = null,
+  onSubmit,
+  onReset,
+}) {
   if (phase === 'loading') return <LoadingScreen progress={progress} />;
-  if (phase === 'ready') return <WorldHUD world={world} chase={chase} onReset={onReset} />;
+  if (phase === 'ready') {
+    return <WorldHUD world={world} chase={chase} npcs={npcs} questState={questState} onReset={onReset} />;
+  }
   if (phase === 'error') return <ErrorScreen error={error} onReset={onReset} />;
   return <LandingScreen onSubmit={onSubmit} />;
 }
@@ -212,7 +224,7 @@ function QuestTracker({ quest }) {
   );
 }
 
-function WorldHUD({ world, chase = null, onReset }) {
+function WorldHUD({ world, chase = null, npcs = [], questState = null, onReset }) {
   const snap = usePlayerSnapshot();
   const vignetteRef = useRef(null);
 
@@ -283,7 +295,7 @@ function WorldHUD({ world, chase = null, onReset }) {
 
       {/* top-right: minimap + new repo */}
       <div className="rw-topright">
-        <Minimap layout={layout} hazards={hazards} chase={chase} size={190} />
+        <Minimap layout={layout} hazards={hazards} chase={chase} npcs={npcs} questState={questState} size={190} />
         <button
           type="button"
           className="rw-btn rw-btn-ghost rw-newrepo"

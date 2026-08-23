@@ -53,6 +53,23 @@ const TURN_AMP = 0.22;
 
 const SKIN_TONES = ['#e8b48a', '#c98a5a', '#8a5a34', '#f2c9a0'];
 
+// Wayfinding beacon: every NPC gets a tall thin light column, matching the
+// convention Bugs.jsx (red) and Greptile.jsx (green) already use — a third,
+// clearly distinct color (blue/gold family) so it's never confused with
+// either. Tone reflects quest state so a beacon is itself an objective: gold
+// for a fresh quest ("!"), blue for one already in progress ("?"), and a
+// dimmer blue for an NPC with nothing new to say — still findable, just not
+// shouting about it. Height sits between Bugs.jsx's (46) and Greptile.jsx's
+// (90): NPCs are landmarks, not chase targets, but still need to clear
+// rooftops city-wide.
+const BEACON_HEIGHT = 60;
+const BEACON_WIDTH = 0.6;
+const BEACON_BASE_Y = 1.95; // just above the head (baseY 1.5 + sy 0.4)
+const BEACON_COLOR_NEW = new THREE.Color('#ffd23f');    // gold — matches the "!" marker
+const BEACON_COLOR_ACTIVE = new THREE.Color('#8fd3ff'); // blue — matches the "?" marker
+const BEACON_COLOR_NONE = new THREE.Color('#4d6a86');   // dim blue — no marker, still visible
+const IDENTITY_QUAT = new THREE.Quaternion(); // beacons don't rotate; never mutated
+
 /** Local body-part layout: offsets from the NPC's root (x/z), the part's
  *  BASE y (geometry pivots at its bottom face, same convention as
  *  Buildings.jsx/Ground.jsx), its box size, and which tint it uses. */
@@ -97,6 +114,25 @@ function darkenHex(hex, amt) {
   _color.set(hex || '#4c8c5b');
   _color.lerp(_black, amt);
   return '#' + _color.getHexString();
+}
+
+let _npcBeaconMat = null;
+/** Unlit, alpha-blended (not additive — Bugs.jsx's note applies here too:
+ *  additive over a bright daytime sky washes out to white, defeating a
+ *  color-coded beacon) so the gold/blue hue reads true at any sky brightness.
+ *  Same recipe as Bugs.jsx/Greptile.jsx's beacon materials. */
+function getBeaconMaterial() {
+  if (!_npcBeaconMat) {
+    _npcBeaconMat = new THREE.MeshBasicMaterial({
+      color: '#ffffff',
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.82,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+  }
+  return _npcBeaconMat;
 }
 
 /* ------------------------------------------------------------------ */
@@ -173,6 +209,59 @@ export default function NPCs({ npcs = [], questState = null, onTalk = null }) {
   }, [list]);
 
   useEffect(() => () => mesh.dispose(), [mesh]);
+
+  // --- quest marker lookup (recomputed only when quest state actually changes) ---
+  // Moved above the beacon block below since the beacon's color depends on it.
+  const questProgressById = useMemo(() => {
+    const map = new Map();
+    for (const q of activeQuests(questState)) map.set(q.id, q.progress);
+    return map;
+  }, [questState]);
+
+  const markerFor = (npc) => {
+    if (!npc.questId) return null;
+    const p = questProgressById.get(npc.questId);
+    if (!p) return null; // done, or quest unknown
+    return p.current > 0 ? '?' : '!';
+  };
+
+  // --- wayfinding beacons: one static instanced column per NPC, tinted by
+  // quest state. Positions never change (NPCs don't move), so matrices/colors
+  // are written in a plain effect rather than every frame in useFrame. ---
+  const beaconMesh = useMemo(() => {
+    const n = list.length;
+    if (n === 0) return null;
+    const m = new THREE.InstancedMesh(getVoxelGeometry(), getBeaconMaterial(), n);
+    m.frustumCulled = false;
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    if (m.instanceColor) m.instanceColor.setUsage(THREE.DynamicDrawUsage);
+    return m;
+  }, [list]);
+
+  useEffect(() => () => { if (beaconMesh) beaconMesh.dispose(); }, [beaconMesh]);
+
+  useEffect(() => {
+    if (!beaconMesh) return;
+    for (let i = 0; i < list.length; i++) {
+      const npc = list[i];
+      const x = Number.isFinite(npc.x) ? npc.x : 0;
+      const z = Number.isFinite(npc.z) ? npc.z : 0;
+      _pos.set(x, BEACON_BASE_Y, z);
+      _scale.set(BEACON_WIDTH, BEACON_HEIGHT, BEACON_WIDTH);
+      _mat.compose(_pos, IDENTITY_QUAT, _scale);
+      beaconMesh.setMatrixAt(i, _mat);
+      // NOTE: call this unconditionally — `instanceColor` starts out null and
+      // is only lazily created BY this very call, so gating it behind
+      // `if (beaconMesh.instanceColor)` (as you'd do for the *needsUpdate*
+      // flag below) would mean it can never fire at all.
+      const marker = markerFor(npc);
+      const col = marker === '!' ? BEACON_COLOR_NEW : marker === '?' ? BEACON_COLOR_ACTIVE : BEACON_COLOR_NONE;
+      beaconMesh.setColorAt(i, col);
+    }
+    beaconMesh.instanceMatrix.needsUpdate = true;
+    if (beaconMesh.instanceColor) beaconMesh.instanceColor.needsUpdate = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beaconMesh, list, questProgressById]);
 
   // --- proximity / talk state ---
   const [nearNpcId, setNearNpcId] = useState(null);
@@ -294,25 +383,12 @@ export default function NPCs({ npcs = [], questState = null, onTalk = null }) {
     }
   });
 
-  // --- quest marker lookup (recomputed only when quest state actually changes) ---
-  const questProgressById = useMemo(() => {
-    const map = new Map();
-    for (const q of activeQuests(questState)) map.set(q.id, q.progress);
-    return map;
-  }, [questState]);
-
-  const markerFor = (npc) => {
-    if (!npc.questId) return null;
-    const p = questProgressById.get(npc.questId);
-    if (!p) return null; // done, or quest unknown
-    return p.current > 0 ? '?' : '!';
-  };
-
   if (list.length === 0) return null;
 
   return (
     <group>
       <primitive object={mesh} />
+      {beaconMesh && <primitive object={beaconMesh} />}
 
       {list.map((npc) => {
         const marker = markerFor(npc);
@@ -336,9 +412,13 @@ export default function NPCs({ npcs = [], questState = null, onTalk = null }) {
             )}
             <Billboard position={[x, 2.0, z]}>
               <Text
-                fontSize={0.28}
+                // Bumped up from 0.28 so the name is still legible at a
+                // moderate distance while the player is homing in on the
+                // beacon above — the beacon does the city-wide wayfinding,
+                // this just needs to confirm "yes, that's them" on approach.
+                fontSize={0.4}
                 color="#fff7e6"
-                outlineWidth={0.03}
+                outlineWidth={0.04}
                 outlineColor="#2b1d0e"
                 anchorX="center"
                 anchorY="bottom"
