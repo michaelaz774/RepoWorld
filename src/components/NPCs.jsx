@@ -31,7 +31,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { createPortal } from 'react-dom';
+import { setDialogue } from '../lib/dialogueStore.js';
 import { useFrame } from '@react-three/fiber';
 import { Billboard, Text } from '@react-three/drei';
 import { playerState } from '../lib/playerState.js';
@@ -135,31 +135,8 @@ function getBeaconMaterial() {
   return _npcBeaconMat;
 }
 
-/* ------------------------------------------------------------------ */
-/* Dialogue box — a single DOM overlay, portaled to document.body      */
-/* ------------------------------------------------------------------ */
-
-function DialogueBox({ npc, lineIndex, onNext, onClose }) {
-  const lines = Array.isArray(npc.lines) ? npc.lines : [];
-  const line = lines[lineIndex] || '';
-  const isLast = lineIndex >= lines.length - 1;
-  return (
-    <div className="npc-dialogue-backdrop">
-      <div className="npc-dialogue-box">
-        <p className="npc-dialogue-name">
-          {npc.name || 'Local'} <span className="npc-dialogue-role">· {npc.role || 'Resident'}</span>
-        </p>
-        <p className="npc-dialogue-text">{line}</p>
-        <div className="npc-dialogue-actions">
-          <button type="button" className="npc-dialogue-btn" onClick={isLast ? onClose : onNext}>
-            {isLast ? 'Close' : 'Next ▸'}
-          </button>
-          <span className="npc-dialogue-hint">[T] continue &middot; [Esc] close</span>
-        </div>
-      </div>
-    </div>
-  );
-}
+/* The dialogue box markup lives in NpcDialogueHost.jsx — it must render outside the
+   Canvas, since DOM elements can't be reconciled inside the R3F tree. */
 
 /* ------------------------------------------------------------------ */
 /* Component                                                            */
@@ -310,7 +287,21 @@ export default function NPCs({ npcs = [], questState = null, onTalk = null }) {
   // Belt-and-suspenders: never leave the player frozen if this unmounts mid-dialogue.
   useEffect(() => () => {
     if (activeNpcRef.current) playerState.uiFocused = false;
+    setDialogue(null);
   }, []);
+
+  // Publish dialogue state OUT of the R3F tree. This component renders inside <Canvas>,
+  // where the active reconciler is three.js — rendering DOM here (even via react-dom's
+  // createPortal, which is what this replaced) makes R3F resolve <div>/<span> against the
+  // THREE namespace and throw. NpcDialogueHost, mounted by App.jsx outside the Canvas,
+  // subscribes to this and renders the real DOM.
+  useEffect(() => {
+    if (activeNpc) {
+      setDialogue({ npc: activeNpc, lineIndex, onNext: advanceDialogue, onClose: closeDialogue });
+    } else {
+      setDialogue(null);
+    }
+  });
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -444,12 +435,8 @@ export default function NPCs({ npcs = [], questState = null, onTalk = null }) {
         );
       })}
 
-      {activeNpc && typeof document !== 'undefined'
-        ? createPortal(
-            <DialogueBox npc={activeNpc} lineIndex={lineIndex} onNext={advanceDialogue} onClose={closeDialogue} />,
-            document.body
-          )
-        : null}
+      {/* The dialogue DOM is rendered by NpcDialogueHost, outside the Canvas — see the
+          publishDialogue effect above for why it can't live in this tree. */}
     </group>
   );
 }

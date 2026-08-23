@@ -3,6 +3,7 @@ import Scene from './Scene.jsx';
 import HUD from './components/HUD.jsx';
 import ReviewPanel from './components/ReviewPanel.jsx';
 import DeployToast from './components/DeployToast.jsx';
+import NpcDialogueHost from './components/NpcDialogueHost.jsx';
 import { loadWorld } from './lib/pipeline.js';
 import { makeCodeFetcher } from './lib/github.js';
 import { isMockRepo } from './lib/mockData.js';
@@ -200,6 +201,7 @@ export default function App() {
         onReset={handleReset}
       />
       {phase === 'ready' ? <DeployToast chase={chase} /> : null}
+      {phase === 'ready' ? <NpcDialogueHost /> : null}
       {phase === 'ready' && reviewHazard ? (
         <ReviewPanel
           repo={world?.repo || null}
