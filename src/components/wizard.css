@@ -1,0 +1,140 @@
+/* Wizard chat — namespaced .rwz-*, own custom properties, like reviewPanel.css. */
+:root {
+  --rwz-violet: #b06cff;
+  --rwz-violet-deep: #4a3b8f;
+  --rwz-ink: #1a1030;
+  --rwz-panel: #e9e3f5;
+  --rwz-panel-edge: #2b2140;
+  --rwz-muted: #6d6285;
+}
+
+/* Docked, NOT modal: the chat stays open while you walk the city, so the strip
+   must not swallow the whole screen or eat clicks meant for the world. Same
+   pointer-events trick as npc.css — the dock is transparent to the mouse, the
+   panel itself is not. */
+.rwz-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  padding: 0 16px 18px;
+}
+
+.rwz-panel {
+  pointer-events: auto;
+  width: min(680px, 94vw);
+  max-height: min(46vh, 420px);
+  display: flex;
+  flex-direction: column;
+  background: var(--rwz-panel);
+  border: 4px solid var(--rwz-panel-edge);
+  border-radius: 4px;
+  box-shadow:
+    inset 3px 3px 0 rgba(255, 255, 255, 0.5),
+    inset -3px -3px 0 rgba(0, 0, 0, 0.25),
+    0 10px 0 rgba(0, 0, 0, 0.35);
+  outline: none;
+}
+
+.rwz-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--rwz-violet-deep);
+  color: #f2e9ff;
+  border-bottom: 4px solid var(--rwz-panel-edge);
+}
+.rwz-title { font-weight: 700; letter-spacing: 0.04em; }
+.rwz-sub { font-size: 12px; opacity: 0.75; }
+.rwz-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #f2e9ff;
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0.8;
+}
+.rwz-close:hover { opacity: 1; }
+
+.rwz-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--rwz-ink);
+  line-height: 1.5;
+}
+
+.rwz-msg { max-width: 92%; white-space: pre-wrap; word-break: break-word; }
+.rwz-msg-user { align-self: flex-end; text-align: right; color: var(--rwz-violet-deep); font-weight: 600; }
+.rwz-msg-wizard { align-self: flex-start; }
+.rwz-msg-error { align-self: flex-start; color: #8c2f2f; font-weight: 600; }
+
+.rwz-tools {
+  font-size: 12px;
+  color: var(--rwz-muted);
+  font-style: italic;
+}
+
+.rwz-form {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-top: 4px solid var(--rwz-panel-edge);
+  background: rgba(255, 255, 255, 0.35);
+}
+.rwz-input {
+  flex: 1;
+  font: inherit;
+  padding: 9px 11px;
+  border: 3px solid var(--rwz-panel-edge);
+  border-radius: 3px;
+  background: #fff;
+  color: var(--rwz-ink);
+  outline: none;
+}
+.rwz-input:focus { border-color: var(--rwz-violet); }
+.rwz-send {
+  font: inherit;
+  font-weight: 700;
+  padding: 9px 18px;
+  border: 3px solid var(--rwz-panel-edge);
+  border-radius: 3px;
+  background: var(--rwz-violet);
+  color: #1a1030;
+  cursor: pointer;
+}
+.rwz-send:disabled { opacity: 0.5; cursor: default; }
+
+/* Key gate */
+.rwz-gate { padding: 16px; color: var(--rwz-ink); }
+.rwz-gate p { margin: 0 0 10px; line-height: 1.55; }
+.rwz-gate-note { font-size: 12px; color: var(--rwz-muted); }
+.rwz-gate-note code { background: rgba(0, 0, 0, 0.07); padding: 1px 4px; border-radius: 2px; }
+
+/* Footer hint: how to get in and out of typing mode. */
+.rwz-modehint {
+  padding: 6px 12px 10px;
+  font-size: 12px;
+  color: var(--rwz-muted);
+  text-align: center;
+}
+.rwz-modehint kbd {
+  font: inherit;
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+  padding: 0 4px;
+}
+
+/* While you are walking rather than typing, fade back so the city stays readable. */
+.rwz-panel-idle { opacity: 0.82; }
+.rwz-panel-idle .rwz-input { background: rgba(255, 255, 255, 0.6); }
