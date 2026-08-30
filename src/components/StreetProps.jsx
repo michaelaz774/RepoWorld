@@ -1,6 +1,9 @@
 /**
  * StreetProps — voxel street furniture: streetlights, benches, bollards,
- * trash bins, planters, signs, and static parked cars.
+ * trash bins, planters and signs.
+ *
+ * Deliberately NO parked cars: every car in the world is a drivable one placed
+ * by Cars.jsx, so a car you walk up to is always a car you can get into.
  *
  * VOXEL ART DIRECTION: every prop is a small compound of axis-aligned unit
  * cubes sharing Ground.jsx's `getVoxelGeometry()` (one BoxGeometry, baked
@@ -8,7 +11,7 @@
  * whole world — terrain, trees, props — draws from a single geometry.
  * Nothing is rotated by an arbitrary angle: since `RoadSegment`s are always
  * axis-aligned, "along the road" is always exactly world X or world Z, so
- * elongated props (arms, bench seats, sign plates, car bodies) just swap
+ * elongated props (arms, bench seats, sign plates) just swap
  * which box dimension is the long one instead of using a quaternion.
  * Everything is placed deterministically by hashing a stable seed string
  * (road id, plot id, index) via Ground.jsx's `hashStr` — no Math.random.
@@ -24,7 +27,7 @@
  *
  * PERFORMANCE: three InstancedMesh draw calls total for this whole file —
  * one for every solid block (poles, arms, benches, bollards, bins,
- * planters, signs, cars), one for lamp heads, one for ground light-pool
+ * planters, signs), one for lamp heads, one for ground light-pool
  * quads. Matrices/colors built once in useMemo; no per-frame work at all.
  */
 import { useEffect, useMemo } from 'react';
@@ -147,8 +150,6 @@ function pushJitteredBox(list, x, y, z, sx, sy, sz, colorHex, seed) {
   list.push({ x, y, z, sx, sy, sz, color: jitteredColor(colorHex, seed) });
 }
 
-const CAR_COLORS = ['#c0392b', '#2f6fae', '#e8d16b', '#3a3f44', '#e8e4da', '#4a7a3a'];
-
 function addStreetlight(blocks, glows, pools, x, z, alongX, side, seed) {
   const poleH = 6.0 + hash01(seed + ':ph');
   pushJitteredBox(blocks, x, 0, z, 0.24, poleH, 0.24, '#888d92', seed);
@@ -210,36 +211,6 @@ function addSign(blocks, x, z, alongX, seed) {
   pushBox(blocks, x, 1.9, z, plateSx, 0.5, plateSz, color);
 }
 
-function addCar(blocks, x, z, alongX, seed) {
-  const color = CAR_COLORS[hashStr(seed + ':cc') % CAR_COLORS.length];
-  const bodyLen = 4.2;
-  const bodyW = 1.8;
-  const bodyH = 0.62;
-  const cabLen = 2.1;
-  const cabW = 1.5;
-  const cabH = 0.5;
-  const bodySx = alongX ? bodyLen : bodyW;
-  const bodySz = alongX ? bodyW : bodyLen;
-  pushBox(blocks, x, 0.32, z, bodySx, bodyH, bodySz, color);
-  const cabOffset = 0.3;
-  const cabX = alongX ? x - cabOffset : x;
-  const cabZ = alongX ? z : z - cabOffset;
-  const cabSx = alongX ? cabLen : cabW;
-  const cabSz = alongX ? cabW : cabLen;
-  pushBox(blocks, cabX, 0.32 + bodyH * 0.5 + cabH * 0.5 - 0.02, cabZ, cabSx, cabH, cabSz, '#dfeaf2');
-  const wheelOffX = alongX ? bodyLen * 0.32 : bodyW * 0.35;
-  const wheelOffZ = alongX ? bodyW * 0.35 : bodyLen * 0.32;
-  const wheelPositions = [
-    [-wheelOffX, -wheelOffZ],
-    [-wheelOffX, wheelOffZ],
-    [wheelOffX, -wheelOffZ],
-    [wheelOffX, wheelOffZ],
-  ];
-  for (const [wdx, wdz] of wheelPositions) {
-    pushBox(blocks, x + wdx, 0.02, z + wdz, 0.34, 0.34, 0.34, '#1c1c1c');
-  }
-}
-
 function addFurniture(blocks, x, z, alongX, seed) {
   const pick = hashStr(seed + ':kind') % 5;
   if (pick === 0) addBench(blocks, x, z, alongX, seed);
@@ -259,13 +230,8 @@ const LIGHT_GAP = 2.4;
 const FURN_SPACING = 24;
 const FURN_INSET = 6;
 const FURN_GAP = 1.5;
-const CAR_GAP = 1.9;
-const CAR_LEN = 4.2;
-const CAR_SPACING = 2.6;
-
 const MAX_LIGHTS = 260;
 const MAX_FURN = 220;
-const MAX_CARS = 220;
 const MAX_SIGNS = 120;
 
 /**
@@ -280,7 +246,6 @@ function buildStreetPropInstances(roads, plots, buildings, roadCells) {
   const pools = [];
   let lightCount = 0;
   let furnitureCount = 0;
-  let carCount = 0;
   let signCount = 0;
   const signSeen = new Set();
 
@@ -353,32 +318,9 @@ function buildStreetPropInstances(roads, plots, buildings, roadCells) {
         furnitureCount++;
       }
     }
-
-    // static parked cars along a subset of non-arterial roads
-    if (road.kind !== 'arterial' && carCount < MAX_CARS) {
-      const doPark = hash01(`${roadId}:park`) < 0.5;
-      if (doPark) {
-        const side = hashStr(`${roadId}:parkside`) % 2 === 0 ? -1 : 1;
-        const step = CAR_LEN + CAR_SPACING;
-        const usableC = len - CAR_LEN - 3;
-        if (usableC > 0) {
-          const nC = Math.floor(usableC / step);
-          for (let i = 0; i <= nC && carCount < MAX_CARS; i++) {
-            const seed = `${roadId}:car:${i}`;
-            if (hash01(seed + ':present') < 0.3) continue;
-            const t = clamp(CAR_LEN * 0.5 + 1.5 + i * step, 1, len - 1);
-            const cx = Math.round((x1 + ux * t + px * side * (halfW - CAR_GAP)) * 2) / 2;
-            const cz = Math.round((z1 + uz * t + pz * side * (halfW - CAR_GAP)) * 2) / 2;
-            if (blocked(cx, cz, buildings, roadCells)) continue;
-            addCar(blocks, cx, cz, alongX, seed);
-            carCount++;
-          }
-        }
-      }
-    }
   }
 
-  // plaza furniture + parking-lot cars
+  // plaza furniture
   for (let p = 0; p < plots.length; p++) {
     const plot = plots[p];
     if (!plot) continue;
@@ -406,27 +348,6 @@ function buildStreetPropInstances(roads, plots, buildings, roadCells) {
         if (blocked(cx, cz, buildings, roadCells)) continue;
         addFurniture(blocks, cx, cz, alongX, seed);
         furnitureCount++;
-      }
-    }
-
-    if (plot.kind === 'lot' && carCount < MAX_CARS) {
-      const alongX = w >= d;
-      const rowSpacing = 2.4;
-      const colSpacing = 5.0;
-      const rows = Math.max(1, Math.floor((alongX ? d : w) / rowSpacing));
-      const cols = Math.max(1, Math.floor((alongX ? w : d) / colSpacing));
-      for (let ri = 0; ri < rows && carCount < MAX_CARS; ri++) {
-        for (let ci = 0; ci < cols && carCount < MAX_CARS; ci++) {
-          const seed = `${plotId}:car:${ri}:${ci}`;
-          if (hash01(seed + ':present') < 0.18) continue;
-          const along = (ci - (cols - 1) / 2) * colSpacing;
-          const across = (ri - (rows - 1) / 2) * rowSpacing;
-          const cx = alongX ? px0 + along : px0 + across;
-          const cz = alongX ? pz0 + across : pz0 + along;
-          if (blocked(cx, cz, buildings, roadCells)) continue;
-          addCar(blocks, cx, cz, alongX, seed);
-          carCount++;
-        }
       }
     }
   }
