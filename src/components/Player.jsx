@@ -17,6 +17,8 @@
  * not required by the shared contract — readers must treat them as optional):
  *   playerState.flying    {boolean} true while fly mode is active
  *   playerState.sprinting {boolean} true while sprint is held and moving
+ *
+ * Stands down entirely while `playerState.driving` is true — see Cars.jsx.
  */
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -105,6 +107,14 @@ export default function Player({ buildings = [], spawn = { x: 0, y: 2, z: 0 } })
   useEffect(() => {
     const k = keys.current;
     const down = (e) => {
+      // While driving, Cars.jsx owns WASD/Shift/Space — and F must not silently
+      // flip fly mode under the car.
+      if (playerState.driving) return;
+      // The keyboard belongs to a text field or a modal panel. Without this,
+      // typing "walk forward" into the wizard's chat toggles fly mode on the "f".
+      // Note this is `typing`, not merely "the chat is open": the wizard chat is
+      // deliberately non-blocking, so you can walk while it is on screen.
+      if (playerState.typing || playerState.uiFocused) return;
       switch (e.code) {
         case 'KeyW': case 'ArrowUp': k.fwd = true; break;
         case 'KeyS': case 'ArrowDown': k.back = true; break;
@@ -167,6 +177,15 @@ export default function Player({ buildings = [], spawn = { x: 0, y: 2, z: 0 } })
 
   // ---- per-frame simulation ----
   useFrame((_, delta) => {
+    // Driving: Cars.jsx owns the camera and publishes playerState itself. Bail
+    // before touching camera.position — uiFocused deliberately does NOT do this
+    // (a dialogue still leaves you standing in the world), only driving does.
+    if (playerState.driving) {
+      vel.current.set(0, 0, 0);
+      grounded.current = true;
+      return;
+    }
+
     const dt = Math.min(delta || 0, MAX_DT);
     const k = keys.current;
     const v = vel.current;

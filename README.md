@@ -88,10 +88,18 @@ your cursor, then click and scroll to read the whole file.
 | `Space` | Jump (rise while flying) |
 | `C` | Descend while flying |
 | `F` | Toggle fly — the best way to see the whole city |
+| `G` | Get into / out of the nearest car (amber beacons mark them) |
+| `R` | Speak with the Wise Wizard (violet beacon) |
+| `Enter` | While the wizard chat is open: start typing (`Esc` returns you to walking) |
 | `E` | Deploy Greptile on the targeted bug |
 | `T` | Talk to a nearby NPC |
 | `Esc` | Release the cursor (then click a code panel to scroll it) |
 | Click | Capture the mouse to look around |
+
+Three drivable cars are parked on the arterials near where you spawn, each under an
+amber beacon. Get in with `G` and the camera drops into a chase view behind the car:
+`W`/`S` drive and reverse, `A`/`D` steer, `Shift` boosts to ~44 u/s, `Space` is the
+handbrake. `G` again puts you back on the pavement beside it.
 
 ---
 

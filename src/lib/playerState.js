@@ -36,6 +36,24 @@ export const playerState = {
   deployRequested: false,
   /** NPC id the player is close enough to talk to, or null */
   nearbyNpc: null,
+  /** Car id the player is close enough to get into, or null (see Cars.jsx) */
+  nearbyCar: null,
+  /** True while the player is close enough to talk to the wizard (see Wizard.jsx) */
+  nearbyWizard: false,
+  /** True only while the player's cursor is in a text field, so letter keys are
+   *  text and not movement. Distinct from `uiFocused`: the wizard chat stays
+   *  open while you walk around, and only steals the keyboard while you type. */
+  typing: false,
+  /** True while the wizard chat is docked on screen. Not a focus flag — the
+   *  world keeps running; the HUD just hides its "press R" prompt. */
+  wizardChatOpen: false,
+  /** The wizard's live world position, published each frame by Wizard.jsx so the
+   *  minimap can mark him. He walks, so these are not constants. */
+  wizardX: null,
+  wizardZ: null,
+  /** True while the player is driving a car. Player.jsx stands down and Cars.jsx
+   *  takes over the camera AND publishing x/y/z/yaw. */
+  driving: false,
   /** True while a full-screen panel (review or dialogue) has focus. Player controls
    *  and pointer lock should stand down while this is true. */
   uiFocused: false,
@@ -60,4 +78,44 @@ export function resetPlayerState(spawn = { x: 0, y: 2, z: 0 }) {
   playerState.dangerLevel = 0;
   playerState.activeHazard = null;
   playerState.hazardsVisited = 0;
+  playerState.nearbyCar = null;
+  playerState.nearbyWizard = false;
+  playerState.typing = false;
+  playerState.wizardChatOpen = false;
+  playerState.wizardX = null;
+  playerState.wizardZ = null;
+  playerState.driving = false;
+  uiFocusOwners.clear();
+  playerState.uiFocused = false;
+}
+
+/* ------------------------------------------------------------------ */
+/* UI focus ownership                                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * `uiFocused` is read by half the app to decide whether to accept input, but it
+ * is a single boolean with no notion of WHO focused it. Two panels can be open
+ * at once — kill a bug while the wizard chat is up and ReviewPanel mounts on
+ * top — and whichever unmounts last used to write `false`, unfreezing the world
+ * underneath a panel that is still on screen.
+ *
+ * Panels claim and release by name instead; the flag stays true while anyone
+ * still holds it.
+ */
+const uiFocusOwners = new Set();
+
+export function acquireUiFocus(owner) {
+  uiFocusOwners.add(owner);
+  playerState.uiFocused = true;
+}
+
+export function releaseUiFocus(owner) {
+  uiFocusOwners.delete(owner);
+  playerState.uiFocused = uiFocusOwners.size > 0;
+}
+
+/** Test/debug helper: who currently holds UI focus. */
+export function uiFocusHolders() {
+  return [...uiFocusOwners];
 }

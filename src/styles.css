@@ -690,6 +690,19 @@ body {
   animation: rw-deploy-bounce 0.9s ease-in-out infinite;
 }
 
+/* Wizard prompt — violet, matching his beacon. */
+.rw-wizard-prompt {
+  background: #8f5fd6;
+  animation: none;
+}
+
+/* Drive prompt — same block as the deploy prompt, wood instead of green so
+   "get in a car" never reads as "deploy Greptile" at a glance. */
+.rw-drive-prompt {
+  background: var(--rw-wood);
+  animation: none;
+}
+
 .rw-deploy-key {
   flex-shrink: 0;
   display: inline-flex;

@@ -126,7 +126,7 @@ function LandingScreen({ onSubmit }) {
 
         <p className="rw-controls-hint">
           <kbd>WASD</kbd> move &nbsp;·&nbsp; <kbd>Shift</kbd> sprint &nbsp;·&nbsp;{' '}
-          <kbd>F</kbd> fly &nbsp;·&nbsp; mouse to look &nbsp;·&nbsp; walk into the fire to inspect it
+          <kbd>F</kbd> fly &nbsp;·&nbsp; <kbd>G</kbd> drive &nbsp;·&nbsp; mouse to look
         </p>
       </div>
     </div>
@@ -192,6 +192,10 @@ function usePlayerSnapshot() {
           prev.targetedBug === playerState.targetedBug &&
           prev.uiFocused === playerState.uiFocused &&
           prev.nearbyNpc === playerState.nearbyNpc &&
+          prev.nearbyCar === playerState.nearbyCar &&
+          prev.nearbyWizard === playerState.nearbyWizard &&
+          prev.wizardChatOpen === playerState.wizardChatOpen &&
+          prev.driving === playerState.driving &&
           Math.abs(prev.dangerLevel - playerState.dangerLevel) < 0.01
         ) return prev;
         return { ...playerState };
@@ -321,10 +325,25 @@ function WorldHUD({ world, chase = null, npcs = [], questState = null, onReset }
 
       {/* bottom-center: deploy prompt > hazard context > controls hint */}
       <div className="rw-bottomcenter">
-        {snap.targetedBug ? (
+        {snap.wizardChatOpen ? null : snap.driving ? (
+          <div className="rw-hint-bar">
+            <kbd>W</kbd>/<kbd>S</kbd> drive · <kbd>A</kbd>/<kbd>D</kbd> steer ·{' '}
+            <kbd>Shift</kbd> boost · <kbd>Space</kbd> brake · <kbd>G</kbd> get out
+          </div>
+        ) : snap.targetedBug ? (
           <div className="rw-deploy-prompt">
             <span className="rw-deploy-key">E</span>
             <span className="rw-deploy-text">DEPLOY GREPTILE</span>
+          </div>
+        ) : snap.nearbyCar ? (
+          <div className="rw-deploy-prompt rw-drive-prompt">
+            <span className="rw-deploy-key">G</span>
+            <span className="rw-deploy-text">DRIVE</span>
+          </div>
+        ) : snap.nearbyWizard && !snap.wizardChatOpen ? (
+          <div className="rw-deploy-prompt rw-wizard-prompt">
+            <span className="rw-deploy-key">R</span>
+            <span className="rw-deploy-text">SPEAK WITH THE WIZARD</span>
           </div>
         ) : activeHazard ? (
           <div className={`rw-hazard-card rw-hazard-${activeHazard.kind}`}>
@@ -342,7 +361,7 @@ function WorldHUD({ world, chase = null, npcs = [], questState = null, onReset }
         ) : (
           <div className="rw-hint-bar">
             <kbd>WASD</kbd> move · <kbd>Shift</kbd> sprint · <kbd>F</kbd> fly ·{' '}
-            <kbd>Esc</kbd> release cursor
+            <kbd>G</kbd> drive · <kbd>R</kbd> wizard · <kbd>Esc</kbd> release cursor
           </div>
         )}
       </div>

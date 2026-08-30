@@ -12,6 +12,7 @@ import { activeQuests } from '../lib/quests.js';
 const HAZARD_COLORS = { issue: '#d43b2e', pr: '#9b5fc0', risk: '#e0a52a' };
 const BUG_COLOR = '#d43b2e';       // red — same red as HAZARD_COLORS.issue / --rw-red
 const GREPTILE_COLOR = '#3ec95a';  // green — matches the in-world Greptile beacon color
+const WIZARD_HUES = ['#ff3b3b', '#ff9d2e', '#ffe14d', '#3ec95a', '#39b7ff', '#8b5cf6'];
 const NPC_NEW_COLOR = '#ffd23f';   // gold — matches NPCs.jsx's "!" marker/beacon
 const NPC_OTHER_COLOR = '#8fd3ff'; // blue — matches NPCs.jsx's "?" marker/beacon (and the
                                     // dim "nothing new" beacon closely enough at this scale)
@@ -215,6 +216,24 @@ export default function Minimap({ layout, hazards = [], chase = null, npcs = [],
           ctx.lineWidth = 1;
           ctx.strokeRect(px - r + 0.5, pz - r + 0.5, r * 2, r * 2);
         }
+      }
+
+      // The wizard — a cycling rainbow pip, matching his sky beam. Drawn last of
+      // the world markers and a size larger than the NPC squares, because
+      // "where is he?" is the single most common reason to look at this map.
+      if (Number.isFinite(playerState.wizardX) && Number.isFinite(playerState.wizardZ)) {
+        const px = Math.round(wx(playerState.wizardX));
+        const pz = Math.round(wz(playerState.wizardZ));
+        const hue = WIZARD_HUES[Math.floor((now || 0) / 220) % WIZARD_HUES.length];
+        const r = 4;
+        ctx.fillStyle = hue;
+        ctx.fillRect(px - r, pz - r, r * 2, r * 2);
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px - r + 0.5, pz - r + 0.5, r * 2, r * 2);
+        // A white pip in the middle so it reads as "special", not just another NPC.
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(px - 1, pz - 1, 2, 2);
       }
 
       // Player arrow (yaw 0 = looking down -Z = up on the map) — flat triangle, dark outline.

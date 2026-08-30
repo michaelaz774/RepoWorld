@@ -34,7 +34,7 @@ import * as THREE from 'three';
 import { setDialogue } from '../lib/dialogueStore.js';
 import { useFrame } from '@react-three/fiber';
 import { Billboard, Text } from '@react-three/drei';
-import { playerState } from '../lib/playerState.js';
+import { playerState, acquireUiFocus, releaseUiFocus } from '../lib/playerState.js';
 import { activeQuests } from '../lib/quests.js';
 import { getVoxelGeometry, hashStr, mulberry32 } from './Ground.jsx';
 import './npc.css';
@@ -255,7 +255,7 @@ export default function NPCs({ npcs = [], questState = null, onTalk = null }) {
     lineIndexRef.current = 0;
     setLineIndex(0);
     setActiveNpc(npc);
-    playerState.uiFocused = true;
+    acquireUiFocus('npc');
     playerState.nearbyNpc = null;
     nearRef.current = null;
     setNearNpcId(null);
@@ -281,12 +281,12 @@ export default function NPCs({ npcs = [], questState = null, onTalk = null }) {
   const closeDialogue = () => {
     activeNpcRef.current = null;
     setActiveNpc(null);
-    playerState.uiFocused = false;
+    releaseUiFocus('npc');
   };
 
   // Belt-and-suspenders: never leave the player frozen if this unmounts mid-dialogue.
   useEffect(() => () => {
-    if (activeNpcRef.current) playerState.uiFocused = false;
+    if (activeNpcRef.current) releaseUiFocus('npc');
     setDialogue(null);
   }, []);
 
@@ -305,6 +305,10 @@ export default function NPCs({ npcs = [], questState = null, onTalk = null }) {
 
   useEffect(() => {
     const onKeyDown = (e) => {
+      // A text field owns the keyboard ("t" is a letter), or another modal panel
+      // does. uiFocused is checked again below for the talk key.
+      if (playerState.typing) return;
+      if (playerState.uiFocused && !activeNpcRef.current) return;
       if (e.code === 'Escape') {
         if (activeNpcRef.current) closeDialogue();
         return;

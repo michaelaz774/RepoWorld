@@ -16,7 +16,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { fetchFix, mockFix, summarizeForLearner } from '../lib/fixes.js';
-import { playerState } from '../lib/playerState.js';
+import { acquireUiFocus, releaseUiFocus } from '../lib/playerState.js';
 import './reviewPanel.css';
 
 const KIND_META = {
@@ -81,7 +81,7 @@ export default function ReviewPanel({ repo = null, hazard = null, onClose = null
   // --- own the player's control focus while open ----------------------
   useEffect(() => {
     if (!hazard) return undefined;
-    playerState.uiFocused = true;
+    acquireUiFocus('review');
     previouslyFocused.current = (typeof document !== 'undefined' && document.activeElement) || null;
 
     let raf = null;
@@ -95,7 +95,7 @@ export default function ReviewPanel({ repo = null, hazard = null, onClose = null
       if (raf != null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(raf);
       // Critical: always stand control back up, no matter how we got here
       // (close button, Approve, Escape, or the hazard prop just changing/unmounting).
-      playerState.uiFocused = false;
+      releaseUiFocus('review');
       const prev = previouslyFocused.current;
       if (prev && typeof prev.focus === 'function') {
         try { prev.focus(); } catch { /* element may no longer be focusable/attached */ }

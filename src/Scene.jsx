@@ -17,8 +17,11 @@ import Bugs from './components/Bugs.jsx';
 import Greptile from './components/Greptile.jsx';
 import Targeting from './components/Targeting.jsx';
 import Player from './components/Player.jsx';
+import Cars from './components/Cars.jsx';
+import Wizard from './components/Wizard.jsx';
 import { EYE_HEIGHT } from './lib/types.js';
 import { playerState } from './lib/playerState.js';
+import { pickWizardHome } from './lib/wizard.js';
 import { assignTarget, stepChase, drainEvents } from './lib/chase.js';
 
 /**
@@ -64,6 +67,9 @@ export default function Scene({
   questState = null,
   onKill = null,
   onTalk = null,
+  wizardControlRef = null,
+  wizardChatOpen = false,
+  wizardStatus = null,
 }) {
   const buildings = world?.layout?.buildings || [];
   const hazards = world?.hazards || [];
@@ -83,6 +89,13 @@ export default function Scene({
   }, [hazards, buildings.length]);
 
   const spawn = world?.spawn || { x: 0, y: EYE_HEIGHT, z: 40 };
+
+  // The wizard waits a short walk from where you land — close enough to find by
+  // his violet beacon, and on clear ground rather than inside a facade.
+  const wizardHome = useMemo(
+    () => pickWizardHome(world?.layout, spawn),
+    [world?.layout, spawn.x, spawn.z]
+  );
   const createdRef = useRef(false);
 
   // R3F v9 only creates its WebGL root once react-use-measure reports a non-zero container
@@ -151,6 +164,18 @@ export default function Scene({
       <ChaseDriver chase={chase} onKill={onKill} />
       <Targeting chase={chase} />
       <Player buildings={buildings} spawn={spawn} />
+      {/* MUST stay after <Player>: same-priority useFrame callbacks run in mount
+          order, and the chase camera has to write camera.position last to win. */}
+      <Cars layout={world?.layout || null} spawn={spawn} />
+      <Wizard
+        home={wizardHome}
+        buildings={buildings}
+        paths={world?.layout?.paths || null}
+        chase={chase}
+        controlRef={wizardControlRef}
+        chatOpen={wizardChatOpen}
+        status={wizardStatus}
+      />
       <AdaptiveDpr pixelated />
     </Canvas>
   );

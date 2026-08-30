@@ -4,10 +4,12 @@ import HUD from './components/HUD.jsx';
 import ReviewPanel from './components/ReviewPanel.jsx';
 import DeployToast from './components/DeployToast.jsx';
 import NpcDialogueHost from './components/NpcDialogueHost.jsx';
+import WizardPanel from './components/WizardPanel.jsx';
 import { loadWorld } from './lib/pipeline.js';
 import { makeCodeFetcher } from './lib/github.js';
 import { isMockRepo } from './lib/mockData.js';
 import { playerState, resetPlayerState } from './lib/playerState.js';
+import { createWizardSession } from './lib/wizardClient.js';
 import { createChase } from './lib/chase.js';
 import {
   generateQuests,
@@ -58,9 +60,40 @@ export default function App() {
   const [npcs, setNpcs] = useState([]);
   const [reviewHazard, setReviewHazard] = useState(null);
   const questRef = useRef(null);
+
+  // ---- Wizard ----------------------------------------------------------------
+  // The key is the player's own and lives in React state for this session only:
+  // no localStorage, no server round-trip. See wizardClient.js.
+  const [wizardKey, setWizardKey] = useState(null);
+  // Only needed for identity-linked keys (personal / service-account keys that
+  // can see more than one workspace); plain workspace keys leave this null.
+  const [wizardWorkspace, setWizardWorkspace] = useState(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardStatus, setWizardStatus] = useState(null);
+  const wizardControlRef = useRef(null);
+  // Read through refs, never captured values: the pipeline republishes a brand
+  // new world object several times per load, and the chase sim is replaced too.
+  const worldRef = useRef(null);
+  const chaseRef = useRef(null);
   // Quest progress is mutated in place by updateQuestProgress; this counter forces the
   // re-render so the HUD tracker actually updates.
   const [questTick, setQuestTick] = useState(0);
+
+  const makeWizardSession = useCallback(() => createWizardSession({
+    apiKey: wizardKey,
+    workspaceId: wizardWorkspace,
+    getWorld: () => worldRef.current,
+    getChase: () => chaseRef.current,
+    getPlayer: () => playerState,
+    // Reuse App's existing code fetcher: it memoises by promise, so the wizard
+    // shares a warm cache with the code panels instead of refetching.
+    readFile: (path) => (fetchCodeRef.current ? fetchCodeRef.current(path) : Promise.resolve('')),
+    control: {
+      moveTo: (x, z) => wizardControlRef.current?.moveTo(x, z) || { error: 'The wizard is not in this world yet.' },
+      setFollow: (on) => wizardControlRef.current?.setFollow(on),
+      position: () => wizardControlRef.current?.position() || null,
+    },
+  }), [wizardKey, wizardWorkspace]);
 
   const recordEvent = useCallback((event) => {
     if (!questRef.current) return;
@@ -82,6 +115,20 @@ export default function App() {
     (npcId) => recordEvent({ type: 'talk', npcId }),
     [recordEvent]
   );
+
+  // R opens the wizard chat when you are near him. Deliberately not gated on
+  // pointer lock (matching the deploy key), so the prompt is never a lie.
+  useEffect(() => {
+    if (phase !== 'ready') return undefined;
+    const onKeyDown = (e) => {
+      if (e.code !== 'KeyR' || e.repeat) return;
+      if (playerState.typing || playerState.uiFocused) return;
+      if (!playerState.nearbyWizard) return;
+      setWizardOpen(true);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [phase]);
 
   // Credit "visit this file / district" objectives as the player walks the city.
   useEffect(() => {
@@ -135,9 +182,12 @@ export default function App() {
 
             // Spin up the game: bugs + Greptile, then quests and the NPCs who give them.
             try {
-              setChase(createChase(nextWorld.hazards, nextWorld.layout.buildings));
+              const nextChase = createChase(nextWorld.hazards, nextWorld.layout.buildings);
+              chaseRef.current = nextChase;
+              setChase(nextChase);
             } catch (err) {
               console.error('[repo-world] chase init failed:', err);
+              chaseRef.current = null;
               setChase(null);
             }
             try {
@@ -153,6 +203,7 @@ export default function App() {
 
             setPhase('ready');
           }
+          worldRef.current = nextWorld;
           setWorld(nextWorld);
         },
       });
@@ -168,6 +219,10 @@ export default function App() {
     abortRef.current?.abort();
     abortRef.current = null;
     fetchCodeRef.current = null;
+    worldRef.current = null;
+    chaseRef.current = null;
+    setWizardOpen(false);
+    setWizardStatus(null);
     setWorld(null);
     setError(null);
     setProgress({ stage: '', detail: '' });
@@ -186,6 +241,9 @@ export default function App() {
             questState={questRef.current}
             onKill={handleKill}
             onTalk={handleTalk}
+            wizardControlRef={wizardControlRef}
+            wizardChatOpen={wizardOpen}
+            wizardStatus={wizardStatus}
           />
         </SceneBoundary>
       ) : null}
@@ -202,6 +260,18 @@ export default function App() {
       />
       {phase === 'ready' ? <DeployToast chase={chase} /> : null}
       {phase === 'ready' ? <NpcDialogueHost /> : null}
+      {phase === 'ready' ? (
+        <WizardPanel
+          open={wizardOpen}
+          onClose={() => setWizardOpen(false)}
+          apiKey={wizardKey}
+          onApiKey={setWizardKey}
+          workspaceId={wizardWorkspace}
+          onWorkspaceId={setWizardWorkspace}
+          makeSession={makeWizardSession}
+          onStatus={setWizardStatus}
+        />
+      ) : null}
       {phase === 'ready' && reviewHazard ? (
         <ReviewPanel
           repo={world?.repo || null}
